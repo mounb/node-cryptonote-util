@@ -775,9 +775,10 @@ namespace cryptonote
     if (b.major_version == BLOCK_MAJOR_VERSION_3) {
       crypto::cn_slow_hash(bd.data(), bd.size(), res);
     }
-    else if (b.major_version == BLOCK_MAJOR_VERSION_4) {
+    else if (b.major_version == BLOCK_MAJOR_VERSION_4 || b.major_version == BLOCK_MAJOR_VERSION_5) {
       // TODO: Integrate the Cryptonight v7 variant. (OPTIONAL)
       // This is not required for the node-cryptonote-utils package.
+	  crypto::cn_lite_hash_v1(bd.data(), bd.size(), res);
     }
     return true;
   }
@@ -866,7 +867,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   bool check_proof_of_work_v2(const block& bl, difficulty_type current_diffic, crypto::hash& proof_of_work)
   {
-    if (BLOCK_MAJOR_VERSION_2 != bl.major_version || BLOCK_MAJOR_VERSION_3 != bl.major_version || BLOCK_MAJOR_VERSION_4 != bl.major_version)
+    if (BLOCK_MAJOR_VERSION_2 != bl.major_version || BLOCK_MAJOR_VERSION_3 != bl.major_version || BLOCK_MAJOR_VERSION_4 != bl.major_version || BLOCK_MAJOR_VERSION_5 != bl.major_version)
       return false;
 
     if (!get_bytecoin_block_longhash(bl, proof_of_work))
