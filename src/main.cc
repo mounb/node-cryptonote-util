@@ -68,8 +68,8 @@ static bool mergeBlocks(const cryptonote::block& block1, cryptonote::block& bloc
 }
 
 static bool construct_parent_block(const cryptonote::block& b, cryptonote::block& parent_block) {
-    parent_block.major_version = b.major_version;
-    parent_block.minor_version = b.minor_version;
+    parent_block.major_version = 1;
+    parent_block.minor_version = 0;
     parent_block.timestamp = b.timestamp;
     parent_block.prev_id = b.prev_id;
     parent_block.nonce = b.parent_block.nonce;
@@ -104,7 +104,12 @@ NAN_METHOD(convert_blob) {
         block parent_block;
         if (!construct_parent_block(b, parent_block))
             return THROW_ERROR_EXCEPTION("Failed to construct parent block");
-
+		
+		 // Set the blocks to the right major and minor versions.
+        parent_block.major_version = b.major_version;
+        parent_block.minor_version = b.minor_version;
+		
+		
         if (!get_block_hashing_blob(parent_block, output))
             return THROW_ERROR_EXCEPTION("Failed to create mining block");
     }
