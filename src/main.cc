@@ -14,14 +14,15 @@
 #include "serialization/binary_utils.h"
 #include <nan.h>
 
-namespace cryptonoteutil {
+#define THROW_ERROR_EXCEPTION(x) Nan::ThrowError(x)
+
+void callback(char* data, void* hint) {
+  free(data);
+}
+
 using namespace node;
 using namespace v8;
 using namespace cryptonote;
-
-void THROW_ERROR_EXCEPTION(const char* msg) {
-    return Nan::ThrowError(msg);
-}
 
 blobdata uint64be_to_blob(uint64_t num) {
     blobdata res = "        ";
@@ -68,8 +69,14 @@ static bool mergeBlocks(const cryptonote::block& block1, cryptonote::block& bloc
 }
 
 static bool construct_parent_block(const cryptonote::block& b, cryptonote::block& parent_block) {
+    if (b.major_version >= 5) {
+        parent_block.minor_version = 1;
+    }
+    else {
+        parent_block.minor_version = 0;
+    }
+
     parent_block.major_version = 1;
-    parent_block.minor_version = 0;
     parent_block.timestamp = b.timestamp;
     parent_block.prev_id = b.prev_id;
     parent_block.nonce = b.parent_block.nonce;
@@ -80,7 +87,6 @@ static bool construct_parent_block(const cryptonote::block& b, cryptonote::block
 }
 
 NAN_METHOD(convert_blob) {
-
     if (info.Length() < 1)
         return THROW_ERROR_EXCEPTION("You must provide one argument.");
 
@@ -104,22 +110,58 @@ NAN_METHOD(convert_blob) {
         block parent_block;
         if (!construct_parent_block(b, parent_block))
             return THROW_ERROR_EXCEPTION("Failed to construct parent block");
-		
-		 output[0] = (char) b.major_version;
-		 output[1] = (char) b.minor_version;
-		
-		
+
         if (!get_block_hashing_blob(parent_block, output))
             return THROW_ERROR_EXCEPTION("Failed to create mining block");
     }
-
+    
     v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)output.data(), output.size()).ToLocalChecked();
-    info.GetReturnValue().Set(returnValue);
+    info.GetReturnValue().Set(
+        returnValue
+    );
 }
 
+NAN_METHOD(convert_blob_fa) {
+    if (info.Length() < 1)
+        return THROW_ERROR_EXCEPTION("You must provide one argument.");
+
+    Local<Object> target = info[0]->ToObject();
+
+    if (!Buffer::HasInstance(target))
+        return THROW_ERROR_EXCEPTION("Argument should be a buffer object.");
+
+    blobdata input = std::string(Buffer::Data(target), Buffer::Length(target));
+    blobdata output = "";
+
+    //convert
+    block b = AUTO_VAL_INIT(b);
+    if (!parse_and_validate_block_from_blob(input, b))
+        return THROW_ERROR_EXCEPTION("Failed to parse block");
+
+    if (b.major_version < BLOCK_MAJOR_VERSION_2 || b.major_version >= BLOCK_MAJOR_VERSION_7) {
+        if (!get_block_hashing_blob(b, output))
+            return THROW_ERROR_EXCEPTION("Failed to create mining block");
+    } else {
+        block parent_block;
+        if (!construct_parent_block(b, parent_block))
+            return THROW_ERROR_EXCEPTION("Failed to construct parent block");
+
+        if (!get_block_hashing_blob(parent_block, output))
+            return THROW_ERROR_EXCEPTION("Failed to create mining block");
+    }
+//    Local<Object> v8::Local<v8::Value> returnValue =  Nan::NewBuffer(output.length()).ToLocalChecked();
+//    memcpy(Buffer::Data(returnValue), output.c_str(), output.length());
+//    info.GetReturnValue().Set(
+//        returnValue
+//    );
+    
+    v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)output.data(), output.size()).ToLocalChecked();
+    info.GetReturnValue().Set(
+        returnValue
+    );
+}
 
 NAN_METHOD(get_block_id) {
-
     if (info.Length() < 1)
         return THROW_ERROR_EXCEPTION("You must provide one argument.");
 
@@ -138,14 +180,15 @@ NAN_METHOD(get_block_id) {
     crypto::hash block_id;
     if (!get_block_hash(b, block_id))
         return THROW_ERROR_EXCEPTION("Failed to calculate hash for block");
-
+    
     char *cstr = reinterpret_cast<char*>(&block_id);
     v8::Local<v8::Value> returnValue = Nan::CopyBuffer(cstr, 32).ToLocalChecked();
-    info.GetReturnValue().Set(returnValue);
+    info.GetReturnValue().Set(
+        returnValue
+    );
 }
 
 NAN_METHOD(construct_block_blob) {
-
     if (info.Length() < 2)
         return THROW_ERROR_EXCEPTION("You must provide two arguments.");
 
@@ -168,7 +211,7 @@ NAN_METHOD(construct_block_blob) {
         return THROW_ERROR_EXCEPTION("Failed to parse block");
 
     b.nonce = nonce;
-    if (b.major_version == BLOCK_MAJOR_VERSION_2 ) {
+    if (b.major_version >= BLOCK_MAJOR_VERSION_2 && b.major_version <= BLOCK_MAJOR_VERSION_5) {
         block parent_block;
         b.parent_block.nonce = nonce;
         if (!construct_parent_block(b, parent_block))
@@ -177,51 +220,59 @@ NAN_METHOD(construct_block_blob) {
         if (!mergeBlocks(parent_block, b, std::vector<crypto::hash>()))
             return THROW_ERROR_EXCEPTION("Failed to postprocess mining block");
     }
-    if (b.major_version == BLOCK_MAJOR_VERSION_3) {
-        block parent_block;
-        b.parent_block.nonce = nonce;
-        if (!construct_parent_block(b, parent_block))
-            return THROW_ERROR_EXCEPTION("Failed to construct parent block");
 
-        if (!mergeBlocks(parent_block, b, std::vector<crypto::hash>()))
-            return THROW_ERROR_EXCEPTION("Failed to postprocess mining block");
-    }
-    if (b.major_version == BLOCK_MAJOR_VERSION_4) {
-      block parent_block;
-      b.parent_block.nonce = nonce;
-      if (!construct_parent_block(b, parent_block))
-        return THROW_ERROR_EXCEPTION("Failed to construct parent block");
-
-      if (!mergeBlocks(parent_block, b, std::vector<crypto::hash>()))
-        return THROW_ERROR_EXCEPTION("Failed to postprocess mining block");
-    }
-	if (b.major_version == BLOCK_MAJOR_VERSION_5) {
-      block parent_block;
-      b.parent_block.nonce = nonce;
-      if (!construct_parent_block(b, parent_block))
-        return THROW_ERROR_EXCEPTION("Failed to construct parent block");
-
-      if (!mergeBlocks(parent_block, b, std::vector<crypto::hash>()))
-        return THROW_ERROR_EXCEPTION("Failed to postprocess mining block");
-    }
-	if (b.major_version == BLOCK_MAJOR_VERSION_7) {
-      block parent_block;
-      b.parent_block.nonce = nonce;
-      if (!construct_parent_block(b, parent_block))
-        return THROW_ERROR_EXCEPTION("Failed to construct parent block");
-
-      if (!mergeBlocks(parent_block, b, std::vector<crypto::hash>()))
-        return THROW_ERROR_EXCEPTION("Failed to postprocess mining block");
-    }
     if (!block_to_blob(b, output))
         return THROW_ERROR_EXCEPTION("Failed to convert block to blob");
 
     v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)output.data(), output.size()).ToLocalChecked();
-    info.GetReturnValue().Set(returnValue);
+    info.GetReturnValue().Set(
+        returnValue
+    );
+}
+
+NAN_METHOD(construct_block_blob_fa) {
+    if (info.Length() < 2)
+        return THROW_ERROR_EXCEPTION("You must provide two arguments.");
+
+    Local<Object> block_template_buf = info[0]->ToObject();
+    Local<Object> nonce_buf = info[1]->ToObject();
+
+    if (!Buffer::HasInstance(block_template_buf) || !Buffer::HasInstance(nonce_buf))
+        return THROW_ERROR_EXCEPTION("Both arguments should be buffer objects.");
+
+    if (Buffer::Length(nonce_buf) != 4)
+        return THROW_ERROR_EXCEPTION("Nonce buffer has invalid size.");
+
+    uint32_t nonce = *reinterpret_cast<uint32_t*>(Buffer::Data(nonce_buf));
+
+    blobdata block_template_blob = std::string(Buffer::Data(block_template_buf), Buffer::Length(block_template_buf));
+    blobdata output = "";
+
+    block b = AUTO_VAL_INIT(b);
+    if (!parse_and_validate_block_from_blob(block_template_blob, b))
+        return THROW_ERROR_EXCEPTION("Failed to parse block");
+
+    b.nonce = nonce;
+    if (b.major_version >= BLOCK_MAJOR_VERSION_2 && b.major_version <= BLOCK_MAJOR_VERSION_5) {
+        block parent_block;
+        b.parent_block.nonce = nonce;
+        if (!construct_parent_block(b, parent_block))
+            return THROW_ERROR_EXCEPTION("Failed to construct parent block");
+
+        if (!mergeBlocks(parent_block, b, std::vector<crypto::hash>()))
+            return THROW_ERROR_EXCEPTION("Failed to postprocess mining block");
+    }
+
+    if (!block_to_blob(b, output))
+        return THROW_ERROR_EXCEPTION("Failed to convert block to blob");
+
+    v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)output.data(), output.size()).ToLocalChecked();
+    info.GetReturnValue().Set(
+        returnValue
+    );
 }
 
 NAN_METHOD(convert_blob_bb) {
-
     if (info.Length() < 1)
         return THROW_ERROR_EXCEPTION("You must provide one argument.");
 
@@ -241,11 +292,12 @@ NAN_METHOD(convert_blob_bb) {
     output = get_block_hashing_blob(b);
 
     v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)output.data(), output.size()).ToLocalChecked();
-    info.GetReturnValue().Set(returnValue);
+    info.GetReturnValue().Set(
+        returnValue
+    );
 }
 
 NAN_METHOD(address_decode) {
-
     if (info.Length() < 1)
         return THROW_ERROR_EXCEPTION("You must provide one argument.");
 
@@ -258,29 +310,119 @@ NAN_METHOD(address_decode) {
 
     blobdata data;
     uint64_t prefix;
-    if (!tools::base58::decode_addr(input, prefix, data)) {
+    if (!tools::base58::decode_addr(input, prefix, data))
+    {
         info.GetReturnValue().Set(Nan::Undefined());
     }
+    //    info.GetReturnValue().Set(Nan::Undefined());
+    
 
     account_public_address adr;
-    if (!::serialization::parse_binary(data, adr)) {
-        info.GetReturnValue().Set(Nan::Undefined());
-    }
+    if (!::serialization::parse_binary(data, adr) || !crypto::check_key(adr.m_spend_public_key) || !crypto::check_key(adr.m_view_public_key))
+    {
+        if(data.length())
+        {
+            data = uint64be_to_blob(prefix) + data;
+        }
+        else
+        {
+            info.GetReturnValue().Set(Nan::Undefined());
+        }
+             v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)data.data(), data.size()).ToLocalChecked();
+        info.GetReturnValue().Set(
+            returnValue
+         );
 
-    if (!crypto::check_key(adr.m_spend_public_key) || !crypto::check_key(adr.m_view_public_key)) {
-        info.GetReturnValue().Set(Nan::Undefined());
     }
-
-    info.GetReturnValue().Set(Nan::New(static_cast<uint32_t>(prefix)));
+    else
+    {
+        info.GetReturnValue().Set(Nan::New(static_cast<uint32_t>(prefix)));
+    }
 }
 
-NAN_MODULE_INIT(Init) {
+NAN_METHOD(cn_slowhash_variant_nimp) {
+    if (info.Length() < 2)
+        THROW_ERROR_EXCEPTION("You must provide 2 arguments.");
+
+    Local<Object> a_input = info[0]->ToObject();
+    uint32_t a_variant = info[1]->Uint32Value();
+
+    if (!Buffer::HasInstance(a_input))
+        THROW_ERROR_EXCEPTION("Argument should be a buffer object.");
+
+    char* input = Buffer::Data(a_input);
+    char output[32];
+    uint32_t input_len = Buffer::Length(a_input);
+
+    if (a_variant > 0 && input_len < 43) THROW_ERROR_EXCEPTION("Variants need more than 43 bytes input.");
+
+    crypto::cn_slow_hash_variant(input, input_len, output, a_variant);
+
+    v8::Local<Object> returnValue = Nan::CopyBuffer(output, 32).ToLocalChecked();
+    info.GetReturnValue().Set(
+        returnValue
+    );
+}
+
+NAN_METHOD(address_decode_integrated) {
+    if (info.Length() < 1)
+        return THROW_ERROR_EXCEPTION("You must provide one argument.");
+
+    Local<Object> target = info[0]->ToObject();
+
+    if (!Buffer::HasInstance(target))
+        return THROW_ERROR_EXCEPTION("Argument should be a buffer object.");
+
+    blobdata input = std::string(Buffer::Data(target), Buffer::Length(target));
+
+    blobdata data;
+    uint64_t prefix;
+    if (!tools::base58::decode_addr(input, prefix, data))
+    {
+        info.GetReturnValue().Set(Nan::Undefined());
+    }
+    //    info.GetReturnValue().Set(Nan::Undefined());
+
+
+    integrated_address iadr;
+    if (!::serialization::parse_binary(data, iadr) || !crypto::check_key(iadr.adr.m_spend_public_key) || !crypto::check_key(iadr.adr.m_view_public_key))
+    {
+        if(data.length())
+        {
+            data = uint64be_to_blob(prefix) + data;
+        }
+        else
+        {
+            info.GetReturnValue().Set(Nan::Undefined());
+        }
+        v8::Local<v8::Value> returnValue = Nan::CopyBuffer((char*)data.data(), data.size()).ToLocalChecked();
+        info.GetReturnValue().Set(
+                returnValue
+        );
+
+    }
+    else
+    {
+        info.GetReturnValue().Set(Nan::New(static_cast<uint32_t>(prefix)));
+    }
+}
+
+// void init(Handle<Object> exports) {
+//     exports->Set(String::NewSymbol("construct_block_blob"), FunctionTemplate::New(construct_block_blob)->GetFunction());
+//     exports->Set(String::NewSymbol("get_block_id"), FunctionTemplate::New(get_block_id)->GetFunction());
+//     exports->Set(String::NewSymbol("convert_blob"), FunctionTemplate::New(convert_blob)->GetFunction());
+//     exports->Set(String::NewSymbol("convert_blob_bb"), FunctionTemplate::New(convert_blob_bb)->GetFunction());
+//     exports->Set(String::NewSymbol("address_decode"), FunctionTemplate::New(address_decode)->GetFunction());
+// }
+
+NAN_MODULE_INIT(init) {
     Nan::Set(target, Nan::New("construct_block_blob").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(construct_block_blob)).ToLocalChecked());
     Nan::Set(target, Nan::New("get_block_id").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(get_block_id)).ToLocalChecked());
     Nan::Set(target, Nan::New("convert_blob").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(convert_blob)).ToLocalChecked());
     Nan::Set(target, Nan::New("convert_blob_bb").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(convert_blob_bb)).ToLocalChecked());
     Nan::Set(target, Nan::New("address_decode").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(address_decode)).ToLocalChecked());
+    Nan::Set(target, Nan::New("cn_slowhash_variant").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(cn_slowhash_variant_nimp)).ToLocalChecked());
+    Nan::Set(target, Nan::New("address_decode_integrated").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(address_decode_integrated)).ToLocalChecked());
 }
 
-NODE_MODULE(cryptonote, Init)
-}
+NODE_MODULE(cryptonote, init)
