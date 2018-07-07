@@ -775,7 +775,7 @@ namespace cryptonote
     if (b.major_version == BLOCK_MAJOR_VERSION_3) {
       crypto::cn_slow_hash(bd.data(), bd.size(), res);
     }
-    else if (b.major_version == BLOCK_MAJOR_VERSION_4 || b.major_version == BLOCK_MAJOR_VERSION_5) {
+    else if (b.major_version == BLOCK_MAJOR_VERSION_4 || b.major_version == BLOCK_MAJOR_VERSION_5 || BLOCK_MAJOR_VERSION_7) {
       // TODO: Integrate the Cryptonight v7 variant. (OPTIONAL)
       // This is not required for the node-cryptonote-utils package.
 	  //crypto::cn_lite_hash_v1(bd.data(), bd.size(), res);
