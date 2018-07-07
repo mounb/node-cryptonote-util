@@ -9,7 +9,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/LucasJones/node-cryptonote-util.git"
+        "url": "https://github.com/Triton-io/node-cryptonote-util"
     },
     "scripts": {
       "test": "node-gyp clean && node-gyp configure && node-gyp build"
