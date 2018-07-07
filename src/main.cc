@@ -97,7 +97,7 @@ NAN_METHOD(convert_blob) {
     if (!parse_and_validate_block_from_blob(input, b))
         return THROW_ERROR_EXCEPTION("Failed to parse block");
 
-    if (b.major_version < BLOCK_MAJOR_VERSION_2) {
+    if (b.major_version < BLOCK_MAJOR_VERSION_2 || b.major_version >= BLOCK_MAJOR_VERSION_7) {
         if (!get_block_hashing_blob(b, output))
             return THROW_ERROR_EXCEPTION("Failed to create mining block");
     } else {
@@ -168,7 +168,7 @@ NAN_METHOD(construct_block_blob) {
         return THROW_ERROR_EXCEPTION("Failed to parse block");
 
     b.nonce = nonce;
-    if (b.major_version == BLOCK_MAJOR_VERSION_2) {
+    if (b.major_version == BLOCK_MAJOR_VERSION_2 || b.major_version >= BLOCK_MAJOR_VERSION_7) {
         block parent_block;
         b.parent_block.nonce = nonce;
         if (!construct_parent_block(b, parent_block))
