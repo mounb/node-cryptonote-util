@@ -69,7 +69,7 @@ static bool mergeBlocks(const cryptonote::block& block1, cryptonote::block& bloc
 }
 
 static bool construct_parent_block(const cryptonote::block& b, cryptonote::block& parent_block) {
-    if (b.major_version >= 5) {
+    if (b.major_version >= 3) {
         parent_block.minor_version = 1;
     }
     else {
@@ -103,7 +103,7 @@ NAN_METHOD(convert_blob) {
     if (!parse_and_validate_block_from_blob(input, b))
         return THROW_ERROR_EXCEPTION("Failed to parse block");
 
-    if (b.major_version < BLOCK_MAJOR_VERSION_2 || b.major_version >= BLOCK_MAJOR_VERSION_7) {
+    if (b.major_version < BLOCK_MAJOR_VERSION_2 || b.major_version >= BLOCK_MAJOR_VERSION_4) {
         if (!get_block_hashing_blob(b, output))
             return THROW_ERROR_EXCEPTION("Failed to create mining block");
     } else {
@@ -138,7 +138,7 @@ NAN_METHOD(convert_blob_fa) {
     if (!parse_and_validate_block_from_blob(input, b))
         return THROW_ERROR_EXCEPTION("Failed to parse block");
 
-    if (b.major_version < BLOCK_MAJOR_VERSION_2 || b.major_version >= BLOCK_MAJOR_VERSION_7) {
+    if (b.major_version < BLOCK_MAJOR_VERSION_2 || b.major_version >= BLOCK_MAJOR_VERSION_4) {
         if (!get_block_hashing_blob(b, output))
             return THROW_ERROR_EXCEPTION("Failed to create mining block");
     } else {
@@ -211,7 +211,7 @@ NAN_METHOD(construct_block_blob) {
         return THROW_ERROR_EXCEPTION("Failed to parse block");
 
     b.nonce = nonce;
-    if (b.major_version >= BLOCK_MAJOR_VERSION_2 && b.major_version <= BLOCK_MAJOR_VERSION_5) {
+    if (b.major_version == BLOCK_MAJOR_VERSION_2 || b.major_version == BLOCK_MAJOR_VERSION_3) {
         block parent_block;
         b.parent_block.nonce = nonce;
         if (!construct_parent_block(b, parent_block))
@@ -253,7 +253,7 @@ NAN_METHOD(construct_block_blob_fa) {
         return THROW_ERROR_EXCEPTION("Failed to parse block");
 
     b.nonce = nonce;
-    if (b.major_version >= BLOCK_MAJOR_VERSION_2 && b.major_version <= BLOCK_MAJOR_VERSION_5) {
+    if (b.major_version == BLOCK_MAJOR_VERSION_2 || b.major_version == BLOCK_MAJOR_VERSION_3) {
         block parent_block;
         b.parent_block.nonce = nonce;
         if (!construct_parent_block(b, parent_block))
