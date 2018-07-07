@@ -705,7 +705,7 @@ namespace cryptonote
     if (!get_block_hashing_blob(b, blob))
       return false;
 
-    if (b.major_version == BLOCK_MAJOR_VERSION_2 || b.major_version == BLOCK_MAJOR_VERSION_3)
+    if (b.major_version <= BLOCK_MAJOR_VERSION_2 && b.major_version <= BLOCK_MAJOR_VERSION_5)
     {
       blobdata parent_blob;
       auto sbb = make_serializable_bytecoin_block(b, true, false);
@@ -906,7 +906,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   bool check_proof_of_work_v1(const block& bl, difficulty_type current_diffic, crypto::hash& proof_of_work)
   {
-    if (BLOCK_MAJOR_VERSION_1 != bl.major_version && bl.major_version < BLOCK_MAJOR_VERSION_4)
+    if (BLOCK_MAJOR_VERSION_1 != bl.major_version && bl.major_version < BLOCK_MAJOR_VERSION_7)
       return false;
 
     proof_of_work = get_block_longhash(bl, 0);
@@ -915,7 +915,7 @@ namespace cryptonote
   //---------------------------------------------------------------
   bool check_proof_of_work_v2(const block& bl, difficulty_type current_diffic, crypto::hash& proof_of_work)
   {
-    if (BLOCK_MAJOR_VERSION_2 != bl.major_version || BLOCK_MAJOR_VERSION_3 != bl.major_version)
+    if (BLOCK_MAJOR_VERSION_2 != bl.major_version || BLOCK_MAJOR_VERSION_3 != bl.major_version || BLOCK_MAJOR_VERSION_4 != bl.major_version || BLOCK_MAJOR_VERSION_5 != bl.major_version)
       return false;
 
     if (!get_bytecoin_block_longhash(bl, proof_of_work))
