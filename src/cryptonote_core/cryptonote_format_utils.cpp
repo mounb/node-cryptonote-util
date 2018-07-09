@@ -705,7 +705,7 @@ namespace cryptonote
     if (!get_block_hashing_blob(b, blob))
       return false;
 
-    if (b.major_version <= BLOCK_MAJOR_VERSION_2 && b.major_version <= BLOCK_MAJOR_VERSION_5)
+    if (b.major_version >= BLOCK_MAJOR_VERSION_2 && b.major_version < BLOCK_MAJOR_VERSION_7)
     {
       blobdata parent_blob;
       auto sbb = make_serializable_bytecoin_block(b, true, false);
